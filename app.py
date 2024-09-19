@@ -37,7 +37,7 @@ swagger_config = {
     "specs": [
         {
             "endpoint": 'docs',
-            "route": '/docs'
+            "route": '/docs.json'
         }
     ],
     "static_url_path": "/flasgger_static",
@@ -91,9 +91,9 @@ def lstm_text():
         original_text = str(request.form["lstm_text"])
         cleaned_text = preprocess_input(original_text)[1]
 
-        loaded_model = load_model(r'LSTM_MODEL/lstm.h5')
+        loaded_model = load_model(r'lstm.h5')
 
-        with open('LSTM_MODEL/tokenizer_lstm.json') as f:
+        with open('tokenizer_lstm.json') as f:
             tokenizer_lstm = tokenizer_from_json(json.load(f))
 
         def pred_sentiment(text):
@@ -136,9 +136,9 @@ def nn_text():
         original_text = str(request.form.get('nn_text'))
         cleaned_text = preprocess_input(original_text)[1]
 
-        with open('NNN_Model/feature.pkl', 'rb') as f:
+        with open('feature.pkl', 'rb') as f:
             loaded_vectorizer = pickle.load(f)
-        with open('NNN_Model/model.pkl', 'rb') as f:
+        with open('model.pkl', 'rb') as f:
             model_NN = pickle.load(f)
 
         text_vectorized = loaded_vectorizer.transform([cleaned_text])
@@ -170,11 +170,15 @@ def lstm_upload():
     try:
         file = request.files["lstm_upload"]
         df_csv = pd.read_csv(file, encoding="latin-1")
-        df_csv['TweetClean'] = df_csv['Tweet'].apply(preprocess_input).apply(lambda x: x[1])
+        
+        # Ambil nama kolom pertama secara dinamis
+        first_column = df_csv.columns[0]
+        
+        df_csv['TweetClean'] = df_csv[first_column].apply(preprocess_input).apply(lambda x: x[1])
 
-        loaded_model = load_model(r'LSTM_Model/lstm.h5')
+        loaded_model = load_model(r'lstm.h5')
 
-        with open('LSTM_Model/tokenizer_lstm.json') as f:
+        with open('tokenizer_lstm.json') as f:
             tokenizer = tokenizer_from_json(json.load(f))
 
         def pred_sentiment(text):
@@ -195,7 +199,7 @@ def lstm_upload():
         cursor.execute('CREATE TABLE IF NOT EXISTS UPLOAD_lstm (TweetOri TEXT, TweetClean TEXT, Sentimen TEXT)')
         for _, row in df_csv.iterrows():
             cursor.execute('INSERT INTO UPLOAD_lstm (TweetOri, TweetClean, Sentimen) VALUES (?, ?, ?)', 
-                           (row['Tweet'], row['TweetClean'], row['Sentimen']))
+                           (row[first_column], row['TweetClean'], row['Sentimen']))
         connection.commit()
 
         # Simpan hasil ke file CSV
@@ -216,11 +220,15 @@ def nn_upload():
     try:
         file = request.files["nn_upload"]
         df_csv = pd.read_csv(file, encoding="latin-1")
-        df_csv['TweetClean'] = df_csv['Tweet'].apply(preprocess_input).apply(lambda x: x[1])
+        
+        # Ambil nama kolom pertama secara dinamis
+        first_column = df_csv.columns[0]
+        
+        df_csv['TweetClean'] = df_csv[first_column].apply(preprocess_input).apply(lambda x: x[1])
 
-        with open('NNN_Model/feature.pkl', 'rb') as f:
+        with open('feature.pkl', 'rb') as f:
             loaded_vectorizer = pickle.load(f)
-        with open('NNN_Model/model.pkl', 'rb') as f:
+        with open('model.pkl', 'rb') as f:
             model_NN = pickle.load(f)
 
         # Prediksi sentimen
@@ -231,7 +239,7 @@ def nn_upload():
         cursor.execute('CREATE TABLE IF NOT EXISTS Upload_nn (original_text TEXT, text TEXT, sentiment TEXT)')
         for _, row in df_csv.iterrows():
             cursor.execute('INSERT INTO Upload_nn (original_text, text, sentiment) VALUES (?, ?, ?)', 
-                           (row['Tweet'], row['TweetClean'], row['Sentimen']))
+                           (row[first_column], row['TweetClean'], row['Sentimen']))
         connection.commit()
 
         # Simpan hasil ke file CSV
@@ -243,6 +251,7 @@ def nn_upload():
         return jsonify("SUKSES")
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)
